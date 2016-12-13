@@ -1,0 +1,10 @@
+<h1>Add Entry</h1>
+
+<form action="/save/" method="POST">
+<div>
+	<textarea name="title" rows="1" cols="25">{{printf "%s" .Title}}</textarea>
+	<textarea name="body" rows="20" cols="80">{{printf "%s" .Body}}</textarea>
+</div>
+<div>
+	<input type="submit" value="Save"></div>
+</form>

@@ -41,8 +41,51 @@ func handler(w http.ResponseWriter, r *http.Request) {
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
 	title := r.URL.Path[len("/view/"):]
-	p := loadPage(title)
+	session, err := mgo.Dial("127.0.0.1:27017")
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("test").C("people")
+	result := Person{}
+	err = c.Find(bson.M{"name": title}).One(&result)
+	if err != nil {
+		panic(err)
+	}
+
+	p := &Page{Title: result.Name, Body: []byte(result.Phone)}
 	renderTemplate(w, "view", p)
+}
+
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/edit/"):]
+	p := loadPage(title)
+	renderTemplate(w, "edit", p)
+}
+
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	p := &Page{Title: title, Body: []byte(body)}
+
+	// now add it to the database
+	session, err := mgo.Dial("127.0.0.1:27017")
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+
+	// Optional. Switch the session to a monotonic behavior.
+	session.SetMode(mgo.Monotonic, true)
+
+	c := session.DB("test").C("people")
+	err = c.Insert(&Person{p.Title, string(p.Body)})
+	if err != nil {
+		panic(err)
+	}
+
+	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 
 func main() {
@@ -62,15 +105,9 @@ func main() {
 		panic(err)
 	}
 
-	result := Person{}
-	err = c.Find(bson.M{"name": "Ale"}).One(&result)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Phone:", result.Phone)
-
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/view/", viewHandler)
+	http.HandleFunc("/edit/", editHandler)
+	http.HandleFunc("/save/", saveHandler)
 	http.ListenAndServe(":8080", nil)
 }
